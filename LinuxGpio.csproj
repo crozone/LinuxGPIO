@@ -1,0 +1,24 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <Authors>Ryan Crosby</Authors>
+    <Company />
+    <Description>A GPIO library for Linux, based on /sys/class/gpio and inotifywait.</Description>
+    <PackageLicenseUrl>https://opensource.org/licenses/MIT</PackageLicenseUrl>
+    <PackageProjectUrl>https://github.com/crozone/LinuxGPIO</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/crozone/LinuxGPIO</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>Linux GPIO netstandard</PackageTags>
+    <PackageReleaseNotes>Initial Release.</PackageReleaseNotes>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
+    <AssemblyName>crozone.LinuxGpio</AssemblyName>
+    <RootNamespace>crozone.LinuxGpio</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="crozone.AsyncResetEvents" Version="1.0.0" />
+  </ItemGroup>
+
+</Project>

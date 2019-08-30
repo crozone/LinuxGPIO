@@ -34,7 +34,7 @@ namespace crozone.LinuxGpio
             this.DeassertionTime = deassertionTime ?? defaultDeassertionTime;
             this.DebounceTime = debounceTime ?? defaultDebounceTime;
 
-            this.pinChangeEvent = new AsyncAutoResetEvent();
+            this.pinChangeEvent = new AsyncAutoResetEvent(false);
             this.isDisposed = false;
         }
 
@@ -84,12 +84,34 @@ namespace crozone.LinuxGpio
             }
         }
 
-        public Task Pulse(CancellationToken cancellationToken)
+        public void Pulse()
         {
-            return Pulse(1, cancellationToken);
+            Pulse(1);
         }
 
-        public async Task Pulse(double assertionTimeMultiplier, CancellationToken cancellationToken)
+        public void Pulse(double assertionTimeMultiplier)
+        {
+            ThrowIfDisposed();
+
+            try
+            {
+                Value = true;
+                Thread.Sleep(TimeSpan.FromTicks((int)Math.Round(AssertionTime.Ticks * assertionTimeMultiplier)));
+            }
+            finally
+            {
+                Value = false;
+            }
+
+            Thread.Sleep(DeassertionTime);
+        }
+
+        public Task PulseAsync(CancellationToken cancellationToken)
+        {
+            return PulseAsync(1, cancellationToken);
+        }
+
+        public async Task PulseAsync(double assertionTimeMultiplier, CancellationToken cancellationToken)
         {
             ThrowIfDisposed();
 
@@ -117,7 +139,20 @@ namespace crozone.LinuxGpio
             pinChangeEvent = null;
         }
 
-        public async Task WaitForSteadyState(bool state, CancellationToken cancellationToken)
+        public void WaitForSteadyState(bool state)
+        {
+            WaitForSteadyStateAsync(state, default(CancellationToken)).Wait();
+        }
+
+        public void WaitForSteadyState(bool state, TimeSpan timeout)
+        {
+            using (CancellationTokenSource cts = new CancellationTokenSource(timeout))
+            {
+                WaitForSteadyStateAsync(state, cts.Token).Wait();
+            }
+        }
+
+        public async Task WaitForSteadyStateAsync(bool state, CancellationToken cancellationToken)
         {
             ThrowIfDisposed();
 

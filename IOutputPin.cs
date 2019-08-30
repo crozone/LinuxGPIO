@@ -18,13 +18,27 @@ namespace crozone.LinuxGpio
         /// and then deasserts the pin for its assertion time.
         /// </summary>
         /// <returns></returns>
-        Task Pulse(CancellationToken cancellationToken);
+        void Pulse();
 
         /// <summary>
         /// Asserts the pin for a multiple of its assertion time,
         /// and then deasserts the pin for its deassertion time.
         /// </summary>
         /// <returns></returns>
-        Task Pulse(double assertionTimeMultiplier, CancellationToken cancellationToken);
+        void Pulse(double assertionTimeMultiplier);
+
+        /// <summary>
+        /// Asserts the pin for its assertion time,
+        /// and then deasserts the pin for its assertion time.
+        /// </summary>
+        /// <returns></returns>
+        Task PulseAsync(CancellationToken cancellationToken);
+
+        /// <summary>
+        /// Asserts the pin for a multiple of its assertion time,
+        /// and then deasserts the pin for its deassertion time.
+        /// </summary>
+        /// <returns></returns>
+        Task PulseAsync(double assertionTimeMultiplier, CancellationToken cancellationToken);
     }
 }

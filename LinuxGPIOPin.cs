@@ -29,7 +29,7 @@ namespace crozone.LinuxGpio
         private bool isDisposed;
 
         public int Pin { get; private set; }
-        public string Name { get; private set;  }
+        public string Name { get; private set; }
         public TimeSpan AssertionTime { get; private set; }
         public TimeSpan DeassertionTime { get; private set; }
 
@@ -222,12 +222,34 @@ namespace crozone.LinuxGpio
             return Path.Combine(gpioDirectory, "gpio" + Pin.ToString());
         }
 
-        public Task Pulse(CancellationToken cancellationToken)
+        public void Pulse()
         {
-            return Pulse(1, cancellationToken);
+            Pulse(1);
         }
 
-        public async Task Pulse(double assertionTimeMultiplier, CancellationToken cancellationToken)
+        public void Pulse(double assertionTimeMultiplier)
+        {
+            ThrowIfDisposed();
+
+            try
+            {
+                Value = true;
+                Thread.Sleep(TimeSpan.FromTicks((int)Math.Round(AssertionTime.Ticks * assertionTimeMultiplier)));
+            }
+            finally
+            {
+                Value = false;
+            }
+
+            Thread.Sleep(DeassertionTime);
+        }
+
+        public Task PulseAsync(CancellationToken cancellationToken)
+        {
+            return PulseAsync(1, cancellationToken);
+        }
+
+        public async Task PulseAsync(double assertionTimeMultiplier, CancellationToken cancellationToken)
         {
             ThrowIfDisposed();
 
@@ -244,7 +266,7 @@ namespace crozone.LinuxGpio
             await Task.Delay(DeassertionTime, cancellationToken);
         }
 
-        public async Task WaitForSteadyState(bool state, CancellationToken token)
+        public void WaitForSteadyState(bool state)
         {
             ThrowIfDisposed();
 
@@ -252,11 +274,43 @@ namespace crozone.LinuxGpio
             //
             if (useInotify && SupportsInotify())
             {
-                await WaitForSteadyStateInotify(state, token);
+                WaitForSteadyStateInotify(state);
             }
             else
             {
-                await WaitForSteadyStatePoll(state, token);
+                WaitForSteadyStatePoll(state);
+            }
+        }
+
+        public void WaitForSteadyState(bool state, TimeSpan timeout)
+        {
+            ThrowIfDisposed();
+
+            // Change strategy based on whether inotify is available or not
+            //
+            if (useInotify && SupportsInotify())
+            {
+                WaitForSteadyStateInotify(state, timeout);
+            }
+            else
+            {
+                WaitForSteadyStatePoll(state, timeout);
+            }
+        }
+
+        public async Task WaitForSteadyStateAsync(bool state, CancellationToken token)
+        {
+            ThrowIfDisposed();
+
+            // Change strategy based on whether inotify is available or not
+            //
+            if (useInotify && SupportsInotify())
+            {
+                await WaitForSteadyStateInotifyAsync(state, token);
+            }
+            else
+            {
+                await WaitForSteadyStatePollAsync(state, token);
             }
         }
 
@@ -289,7 +343,43 @@ namespace crozone.LinuxGpio
             }
         }
 
-        private async Task WaitForSteadyStatePoll(bool state, CancellationToken token)
+        private void WaitForSteadyStatePoll(bool state)
+        {
+            WaitForSteadyStatePoll(state, Timeout.InfiniteTimeSpan);
+        }
+
+        private void WaitForSteadyStatePoll(bool state, TimeSpan timeout)
+        {
+            Stopwatch stopwatch = new Stopwatch();
+            Stopwatch timeoutStopwatch = new Stopwatch();
+
+            stopwatch.Start();
+            timeoutStopwatch.Start();
+
+            while (true)
+            {
+                if(timeout != Timeout.InfiniteTimeSpan && timeoutStopwatch.Elapsed > timeout)
+                {
+                    throw new TimeoutException($"Pin did not reach desired steady state {state} before {timeout} timeout");
+                }
+
+                Thread.Sleep(1);
+
+                if (this.Value = state)
+                {
+                    if (stopwatch.Elapsed > DebounceTime)
+                    {
+                        return;
+                    }
+                }
+                else
+                {
+                    stopwatch.Restart();
+                }
+            }
+        }
+
+        private async Task WaitForSteadyStatePollAsync(bool state, CancellationToken token)
         {
             Stopwatch stopwatch = new Stopwatch();
 
@@ -315,7 +405,160 @@ namespace crozone.LinuxGpio
             }
         }
 
-        private async Task WaitForSteadyStateInotify(bool state, CancellationToken token)
+        private void WaitForSteadyStateInotify(bool state)
+        {
+            WaitForSteadyStateInotify(state, Timeout.InfiniteTimeSpan);
+        }
+
+        private void WaitForSteadyStateInotify(bool state, TimeSpan timeout)
+        {
+            // AsyncAutoResetEvent for tracking when the pin changes.
+            // When this is Unset, the pin has not changed, and we don't need to repoll its state.
+            // When this is Set, the pin has changed, and we need to repoll it.
+            //
+            using (AutoResetEvent pinChangedEvent = new AutoResetEvent(true))
+
+            // Timed async reset event for tracking the pin stable state.
+            // When this is Unset, the pin state is not stable.
+            // When this is Set, the pin state is stable.
+            //
+            using (TimedAutoResetEvent pinStableEvent = new TimedAutoResetEvent(true))
+            {
+
+                // This is called when a new pin change notification is received.
+                // It is passed to the WaitNotify method, which calls it synchronously
+                // on its threadpool thread.
+                //
+                void notifyCallback(NotifyWaitResponse response)
+                {
+                    // Every time the pin changes, reset the reset event to notify waiters that the pin changed
+                    //
+                    pinChangedEvent.Set();
+
+                    // Reset the stable event to indicate the pin is unstable.
+                    //
+                    pinStableEvent.ResetAndSetAfter(DebounceTime);
+                }
+
+                // This is the cancellation source for the NotifyWait task.
+                // It is fired when we want to stop the NotifyWait task.
+                //
+                CancellationTokenSource notifyWaitTaskCancellationSource = new CancellationTokenSource();
+
+                // This is the NotifyWait task. It waits on an inotify mechanism
+                // and calls the notifyCallback whenever an inotify modify event occurs
+                // on the GPIO value file for this pin.
+                //
+                Task notifyWaitTask = Task.Run(async () => await NotifyWaitHelpers.NotifyWait(
+                    GetValuePath(),
+                    new string[] { "modify" },
+                    notifyCallback,
+                    notifyWaitTaskCancellationSource.Token),
+                    notifyWaitTaskCancellationSource.Token);
+
+                Stopwatch timeoutWatch = new Stopwatch();
+                timeoutWatch.Start();
+
+                try
+                {
+                    // Since we don't know the state of the pin before this method was called,
+                    // reset the stable event and have it set itself after debounce time.
+                    //
+                    pinStableEvent.ResetAndSetAfter(DebounceTime);
+
+                    // Loop wait for the pin value to become both steady, and the value we want.
+                    //
+                    while (true)
+                    {
+                        if (timeout != Timeout.InfiniteTimeSpan && timeoutWatch.Elapsed > timeout)
+                        {
+                            throw new TimeoutException($"Pin did not reach desired steady state {state} before {timeout} timeout");
+                        }
+
+                        // Wait for the pin changed event
+                        //
+                        pinChangedEvent.WaitOne();
+
+                        // Compare the current state to the pin's current value
+                        //
+                        if (Value != state)
+                        {
+                            // If the state isn't the state we want, just go back to waiting now
+                            //
+                            continue;
+                        }
+
+                        //
+                        // The state is correct, now we just need to wait and see if it remains stable.
+                        //
+
+                        // Wait to be notified that the pin state has remained stable
+                        //
+                        pinStableEvent.WaitOne();
+
+                        //
+                        // Measure the state again. It should be the same as the last measurement to be considered stable
+                        // for this loop.
+                        //
+
+                        // Check that the last state is in the state we want.
+                        //
+                        if (Value != state)
+                        {
+                            // The state is not the state we want. Go around the loop and wait more.
+                            //
+                            continue;
+                        }
+
+                        //
+                        // We have reached the state we were waiting for.
+                        //
+
+                        // Break the waiting loop.
+                        //
+                        break;
+                    }
+                }
+                catch (TimeoutException)
+                {
+                    // Rethrow the timeout exception.
+                    //
+                    throw;
+                }
+                catch (OperationCanceledException)
+                {
+                    // Rethrow the cancellation exception.
+                    //
+                    throw;
+                }
+                finally
+                {
+                    //
+                    // At this point, we have either successfully waited for
+                    // the pin to change state and become steady, or the task
+                    // has been cancelled. Either way, we need to clean up.
+                    //
+
+                    // Trigger the notify wait task cancellation source
+                    //
+                    notifyWaitTaskCancellationSource.Cancel();
+
+                    // Wait for the notify wait task to cancel
+                    //
+                    try
+                    {
+                        notifyWaitTask.Wait();
+                    }
+                    catch (OperationCanceledException)
+                    {
+
+                    }
+
+                }
+            }
+        }
+
+        private async Task WaitForSteadyStateInotifyAsync(bool state, CancellationToken token)
         {
             // AsyncAutoResetEvent for tracking when the pin changes.
             // When this is Unset, the pin has not changed, and we don't need to repoll its state.
@@ -327,135 +570,132 @@ namespace crozone.LinuxGpio
             // When this is Unset, the pin state is not stable.
             // When this is Set, the pin state is stable.
             //
-            AsyncTimedResetEvent pinStableEvent = new AsyncTimedResetEvent(true, true);
+            using (AsyncTimedResetEvent pinStableEvent = new AsyncTimedResetEvent(true, true)) {
 
-            // This is called when a new pin change notification is received.
-            // It is passed to the WaitNotify method, which calls it synchronously
-            // on its threadpool thread.
-            //
-            void notifyCallback(NotifyWaitResponse response)
-            {
-                // Every time the pin changes, reset the reset event to notify waiters that the pin changed
+                // This is called when a new pin change notification is received.
+                // It is passed to the WaitNotify method, which calls it synchronously
+                // on its threadpool thread.
                 //
-                pinChangedEvent.Set();
-
-                // Reset the stable event to indicate the pin is unstable.
-                //
-                pinStableEvent.ResetAndSetAfter(DebounceTime);
-            }
-
-            // This is the cancellation source for the NotifyWait task.
-            // It is fired when we want to stop the NotifyWait task.
-            //
-            CancellationTokenSource notifyWaitTaskCancellationSource = new CancellationTokenSource();
-
-            // This is the NotifyWait task. It waits on an inotify mechanism
-            // and calls the notifyCallback whenever an inotify modify event occurs
-            // on the GPIO value file for this pin.
-            //
-            Task notifyWaitTask = Task.Run(async () => await NotifyWaitHelpers.NotifyWait(
-                GetValuePath(),
-                new string[] { "modify" },
-                notifyCallback,
-                notifyWaitTaskCancellationSource.Token),
-                notifyWaitTaskCancellationSource.Token);
-
-            try
-            {
-                // Since we don't know the state of the pin before this method was called,
-                // reset the stable event and have it set itself after debounce time.
-                //
-                pinStableEvent.ResetAndSetAfter(DebounceTime);
-
-                // Loop wait for the pin value to become both steady, and the value we want.
-                //
-                while (true)
+                void notifyCallback(NotifyWaitResponse response)
                 {
-                    // Exit the loop with an OperationCanceledException if the cancellation source
-                    // was triggered.
+                    // Every time the pin changes, reset the reset event to notify waiters that the pin changed
                     //
-                    token.ThrowIfCancellationRequested();
+                    pinChangedEvent.Set();
 
-                    // Wait for the pin changed event
+                    // Reset the stable event to indicate the pin is unstable.
                     //
-                    await pinChangedEvent.WaitAsync(token);
-
-                    // Compare the current state to the pin's current value
-                    //
-                    if (Value != state)
-                    {
-                        // If the state isn't the state we want, just go back to waiting now
-                        //
-                        continue;
-                    }
-
-                    //
-                    // The state is correct, now we just need to wait and see if it remains stable.
-                    //
-
-                    // Wait to be notified that the pin state has remained stable
-                    //
-                    await pinStableEvent.WaitAsync(token);
-
-                    //
-                    // Measure the state again. It should be the same as the last measurement to be considered stable
-                    // for this loop.
-                    //
-
-                    // Check that the last state is in the state we want.
-                    //
-                    if (Value != state)
-                    {
-                        // The state is not the state we want. Go around the loop and wait more.
-                        //
-                        continue;
-                    }
-
-                    //
-                    // We have reached the state we were waiting for.
-                    //
-
-                    // Break the waiting loop.
-                    //
-                    break;
+                    pinStableEvent.ResetAndSetAfter(DebounceTime);
                 }
-            }
-            catch (OperationCanceledException)
-            {
-                // Rethrow the cancellation exception.
-                //
-                throw;
-            }
-            finally
-            {
-                //
-                // At this point, we have either successfully waited for
-                // the pin to change state and become steady, or the task
-                // has been cancelled. Either way, we need to clean up.
-                //
 
-                // Trigger the notify wait task cancellation source
+                // This is the cancellation source for the NotifyWait task.
+                // It is fired when we want to stop the NotifyWait task.
                 //
-                notifyWaitTaskCancellationSource.Cancel();
+                CancellationTokenSource notifyWaitTaskCancellationSource = new CancellationTokenSource();
 
-                // Wait for the notify wait task to cancel
+                // This is the NotifyWait task. It waits on an inotify mechanism
+                // and calls the notifyCallback whenever an inotify modify event occurs
+                // on the GPIO value file for this pin.
                 //
+                Task notifyWaitTask = Task.Run(async () => await NotifyWaitHelpers.NotifyWait(
+                    GetValuePath(),
+                    new string[] { "modify" },
+                    notifyCallback,
+                    notifyWaitTaskCancellationSource.Token),
+                    notifyWaitTaskCancellationSource.Token);
+
                 try
                 {
-                    await notifyWaitTask;
+                    // Since we don't know the state of the pin before this method was called,
+                    // reset the stable event and have it set itself after debounce time.
+                    //
+                    pinStableEvent.ResetAndSetAfter(DebounceTime);
+
+                    // Loop wait for the pin value to become both steady, and the value we want.
+                    //
+                    while (true)
+                    {
+                        // Exit the loop with an OperationCanceledException if the cancellation source
+                        // was triggered.
+                        //
+                        token.ThrowIfCancellationRequested();
+
+                        // Wait for the pin changed event
+                        //
+                        await pinChangedEvent.WaitAsync(token);
+
+                        // Compare the current state to the pin's current value
+                        //
+                        if (Value != state)
+                        {
+                            // If the state isn't the state we want, just go back to waiting now
+                            //
+                            continue;
+                        }
+
+                        //
+                        // The state is correct, now we just need to wait and see if it remains stable.
+                        //
+
+                        // Wait to be notified that the pin state has remained stable
+                        //
+                        await pinStableEvent.WaitAsync(token);
+
+                        //
+                        // Measure the state again. It should be the same as the last measurement to be considered stable
+                        // for this loop.
+                        //
+
+                        // Check that the last state is in the state we want.
+                        //
+                        if (Value != state)
+                        {
+                            // The state is not the state we want. Go around the loop and wait more.
+                            //
+                            continue;
+                        }
+
+                        //
+                        // We have reached the state we were waiting for.
+                        //
+
+                        // Break the waiting loop.
+                        //
+                        break;
+                    }
                 }
                 catch (OperationCanceledException)
                 {
-
+                    // Rethrow the cancellation exception.
+                    //
+                    throw;
                 }
+                finally
+                {
+                    //
+                    // At this point, we have either successfully waited for
+                    // the pin to change state and become steady, or the task
+                    // has been cancelled. Either way, we need to clean up.
+                    //
 
-                // Dispose of the cancellation token source
-                //
-                notifyWaitTaskCancellationSource.Dispose();
+                    // Trigger the notify wait task cancellation source
+                    //
+                    notifyWaitTaskCancellationSource.Cancel();
 
-                // Dispose the timed reset event
-                //
-                pinStableEvent.Dispose();
+                    // Wait for the notify wait task to cancel
+                    //
+                    try
+                    {
+                        await notifyWaitTask;
+                    }
+                    catch (OperationCanceledException)
+                    {
+
+                    }
+
+                    // Dispose of the cancellation token source
+                    //
+                    notifyWaitTaskCancellationSource.Dispose();
+                }
             }
         }
 

@@ -12,6 +12,9 @@ namespace crozone.LinuxGpio
         GpioDirection Direction { get; }
         bool ActiveLow { get; set; }
         bool Value { get;}
-        Task WaitForSteadyState(bool state, CancellationToken cancellationToken);
+
+        void WaitForSteadyState(bool state);
+        void WaitForSteadyState(bool state, TimeSpan timeout);
+        Task WaitForSteadyStateAsync(bool state, CancellationToken cancellationToken);
     }
 }

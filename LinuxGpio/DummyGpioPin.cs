@@ -181,9 +181,21 @@ namespace crozone.LinuxGpio
 
         private void SetValueInternal(bool value)
         {
-            bool newValue = value ^ realActiveLow;
-            realValue = newValue;
-            NotifyAllScopesOfPinChange(newValue);
+            if (Direction == GpioDirection.Output)
+            {
+                bool oldValue = realValue;
+                bool newValue = value ^ realActiveLow;
+                realValue = newValue;
+
+                if (oldValue != newValue)
+                {
+                    NotifyAllScopesOfPinChange(value);
+                }
+            }
+            else
+            {
+                throw new InvalidOperationException($"Cannot set value for an {GpioDirection.Input} direction pin");
+            }
         }
 
         private bool enableRaisingEvents;

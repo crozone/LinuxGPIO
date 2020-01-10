@@ -18,8 +18,4 @@
     <Version>2.0.0-alpha</Version>
   </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="crozone.AsyncResetEvents" Version="1.0.1" />
-  </ItemGroup>
-
 </Project>

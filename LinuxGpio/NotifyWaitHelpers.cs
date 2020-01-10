@@ -51,6 +51,8 @@ namespace crozone.LinuxGpio
                             //
                             string line = await process.StandardOutput.ReadLineAsync();
 
+                            token.ThrowIfCancellationRequested();
+
                             // Every time we read a line, announce the inotify with the notify callback
                             //
                             if (!string.IsNullOrWhiteSpace(line))

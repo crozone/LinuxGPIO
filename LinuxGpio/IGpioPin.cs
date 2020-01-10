@@ -11,9 +11,10 @@ namespace crozone.LinuxGpio
     {
         int Pin { get; }
         string Name { get; }
-        GpioDirection Direction { get; }
+        GpioDirection Direction { get; set; }
         bool ActiveLow { get; set; }
-        bool Value { get; }
+        bool Value { get; set; }
+        bool EnableRaisingEvents { get; set; }
         event EventHandler<PinValueChangedEventArgs> ValueChanged;
 
         void Open();

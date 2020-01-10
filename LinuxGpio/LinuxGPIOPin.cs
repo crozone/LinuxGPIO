@@ -356,7 +356,7 @@ namespace crozone.LinuxGpio
 
                     try
                     {
-                        ValueChanged?.Invoke(this, new PinValueChangedEventArgs(value));
+                        ValueChanged?.Invoke(this, new PinValueChangedEventArgs(this, value));
                     }
                     catch
                     {

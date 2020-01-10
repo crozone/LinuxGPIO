@@ -6,6 +6,6 @@ namespace crozone.LinuxGpio
 {
     public interface IInputPin : IGpioPin
     {
-
+        new bool Value { get; }
     }
 }

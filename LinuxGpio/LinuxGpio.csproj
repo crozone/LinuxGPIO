@@ -10,7 +10,7 @@
     <RepositoryUrl>https://github.com/crozone/LinuxGPIO</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageTags>Linux GPIO netstandard</PackageTags>
-    <PackageReleaseNotes>Added support for .NET 4.5</PackageReleaseNotes>
+    <PackageReleaseNotes>Release 2.0. Large refactor with breaking changes from 1.0.</PackageReleaseNotes>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <AssemblyName>crozone.LinuxGpio</AssemblyName>

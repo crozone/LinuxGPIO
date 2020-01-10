@@ -6,11 +6,13 @@ namespace crozone.LinuxGpio
 {
     public class PinValueChangedEventArgs : EventArgs
     {
-        public PinValueChangedEventArgs(bool value)
+        public PinValueChangedEventArgs(IGpioPin pin, bool value)
         {
+            Pin = pin;
             Value = value;
         }
 
+        public IGpioPin Pin { get; }
         public bool Value { get; }
     }
 }

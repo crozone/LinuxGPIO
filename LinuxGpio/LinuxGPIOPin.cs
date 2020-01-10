@@ -23,7 +23,7 @@ namespace crozone.LinuxGpio
         private bool isOpened;
 
         private readonly object pinChangeRegistrationScopesLock = new object();
-        private List<PinChangeRegistrationScope> pinChangeRegistrationScopes = new List<PinChangeRegistrationScope>();
+        private readonly List<PinChangeRegistrationScope> pinChangeRegistrationScopes = new List<PinChangeRegistrationScope>();
         private Task pinMonitorTask = null;
         private CancellationTokenSource pinMonitorTaskCancellationSource = null;
 
@@ -68,6 +68,10 @@ namespace crozone.LinuxGpio
                 {
                     throw new InvalidOperationException("Could not export the pin");
                 }
+            }
+            else
+            {
+                EnsurePinIsExported();
             }
 
             if (UseInotify && !PlatformSupportsInotify())

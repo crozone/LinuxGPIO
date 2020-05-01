@@ -94,11 +94,11 @@ namespace crozone.LinuxGpio
 
                 string currentDirection = File.ReadAllText(GetDirectionPath());
 
-                if (GpioDirection.Input.ToDirectionString() == currentDirection)
+                if ("in" == currentDirection)
                 {
                     return GpioDirection.Input;
                 }
-                else if (GpioDirection.Output.ToDirectionString() == currentDirection)
+                else if ("out" == currentDirection)
                 {
                     return GpioDirection.Output;
                 }

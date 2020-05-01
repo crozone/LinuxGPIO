@@ -125,13 +125,15 @@ namespace crozone.LinuxGpio
 
         private GpioDirection GetDirectionInternal()
         {
-            string currentDirection = File.ReadAllText(GetDirectionPath());
+            string currentDirection = File.ReadAllText(GetDirectionPath()).Trim();
 
-            if (GpioDirection.Input.ToDirectionString() == currentDirection)
+            if (string.Equals(Constants.GpioDirectionInputValue, currentDirection, StringComparison.OrdinalIgnoreCase))
             {
                 return GpioDirection.Input;
             }
-            else if (GpioDirection.Output.ToDirectionString() == currentDirection)
+            else if (string.Equals(Constants.GpioDirectionOutputValue, currentDirection, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(Constants.GpioDirectionOutputHighValue, currentDirection, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(Constants.GpioDirectionOutputLowValue, currentDirection, StringComparison.OrdinalIgnoreCase))
             {
                 return GpioDirection.Output;
             }
@@ -194,9 +196,9 @@ namespace crozone.LinuxGpio
             //
             switch (activeLowValue.Trim())
             {
-                case "0":
+                case Constants.GpioActiveLowFalseValue:
                     return false;
-                case "1":
+                case Constants.GpioActiveLowTrueValue:
                     return true;
                 default:
                     throw new InvalidOperationException($"active_low returned unexpected result: {activeLowValue}");
@@ -207,7 +209,7 @@ namespace crozone.LinuxGpio
         {
             try
             {
-                File.WriteAllText(GetActiveLowPath(), (value ? "1" : "0"));
+                File.WriteAllText(GetActiveLowPath(), (value ? Constants.GpioActiveLowTrueValue : Constants.GpioActiveLowFalseValue));
             }
             catch { }
         }
@@ -251,9 +253,9 @@ namespace crozone.LinuxGpio
             //
             switch (pinValue.Trim())
             {
-                case "0":
+                case Constants.GpioValueFalseValue:
                     return false;
-                case "1":
+                case Constants.GpioValueTrueValue:
                     return true;
                 default:
                     throw new InvalidOperationException($"value returned unexpected result: {pinValue}");
@@ -266,7 +268,7 @@ namespace crozone.LinuxGpio
             {
                 // "/sys/class/gpio/gpio32/value"
                 //
-                File.WriteAllText(GetValuePath(), (value ? "1" : "0"));
+                File.WriteAllText(GetValuePath(), (value ? Constants.GpioValueTrueValue : Constants.GpioValueFalseValue));
             }
             else
             {

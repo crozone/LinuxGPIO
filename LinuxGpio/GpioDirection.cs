@@ -15,18 +15,18 @@ namespace crozone.LinuxGpio
             switch(direction)
             {
                 case GpioDirection.Input:
-                    return "in";
+                    return Constants.GpioDirectionInputValue;
                 case GpioDirection.Output:
                     if (initialLevel.HasValue)
                     {
-                        return initialLevel.Value ? "high" : "low";
+                        return initialLevel.Value ? Constants.GpioDirectionOutputHighValue : Constants.GpioDirectionOutputLowValue;
                     }
                     else
                     {
-                        return "out";
+                        return Constants.GpioDirectionOutputValue;
                     }
                 default:
-                    throw new InvalidOperationException("Invalid direction value");
+                    throw new InvalidOperationException($"Invalid direction value {direction}");
 
             }
         }

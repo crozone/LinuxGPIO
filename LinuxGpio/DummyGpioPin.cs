@@ -18,7 +18,7 @@ namespace crozone.LinuxGpio
         private bool realValue = false;
 
         private readonly object pinChangeRegistrationScopesLock = new object();
-        private List<PinChangeRegistrationScope> pinChangeRegistrationScopes = new List<PinChangeRegistrationScope>();
+        private readonly List<PinChangeRegistrationScope> pinChangeRegistrationScopes = new List<PinChangeRegistrationScope>();
 
         private readonly object pinEventRaisingTaskLock = new object();
         private Task pinEventRaisingTask = null;

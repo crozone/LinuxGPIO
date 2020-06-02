@@ -10,7 +10,7 @@
     <RepositoryUrl>https://github.com/crozone/LinuxGPIO</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageTags>Linux GPIO netstandard</PackageTags>
-    <PackageReleaseNotes>Fix GPIO direction bug</PackageReleaseNotes>
+    <PackageReleaseNotes>Use a FileShare mode of ReadWrite when reading and writing to GPIO sysfs files. This should avoid file sharing issues during concurrent GPIO access.</PackageReleaseNotes>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <AssemblyName>crozone.LinuxGpio</AssemblyName>

@@ -2,6 +2,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -92,7 +93,7 @@ namespace crozone.LinuxGpio
             get {
                 ThrowIfDisposed();
 
-                string currentDirection = File.ReadAllText(GetDirectionPath());
+                string currentDirection = InternalReadAllText(GetDirectionPath());
 
                 if ("in" == currentDirection)
                 {
@@ -118,7 +119,7 @@ namespace crozone.LinuxGpio
 
                 // Set the direction
                 //
-                File.WriteAllText(pinDirectionPath, directionString);
+                InternalWriteAllText(pinDirectionPath, directionString);
 
                 // Set edge detection if the direction is input
                 //
@@ -135,7 +136,7 @@ namespace crozone.LinuxGpio
 
                 // Read in the gpio active_low value
                 //
-                string activeLowValue = File.ReadAllText(GetActiveLowPath());
+                string activeLowValue = InternalReadAllText(GetActiveLowPath());
 
                 // Decode the output
                 //
@@ -154,7 +155,7 @@ namespace crozone.LinuxGpio
 
                 try
                 {
-                    File.WriteAllText(GetActiveLowPath(), (value ? "1" : "0"));
+                    InternalWriteAllText(GetActiveLowPath(), (value ? "1" : "0"));
                 }
                 catch { }
             }
@@ -172,7 +173,7 @@ namespace crozone.LinuxGpio
 
                 // Read in the gpio value
                 //
-                string pinValue = File.ReadAllText(GetValuePath());
+                string pinValue = InternalReadAllText(GetValuePath());
 
                 // Decode the output
                 //
@@ -195,7 +196,7 @@ namespace crozone.LinuxGpio
                 {
                     // "/sys/class/gpio/gpio32/value"
                     //
-                    File.WriteAllText(GetValuePath(), (value ? "1" : "0"));
+                    InternalWriteAllText(GetValuePath(), (value ? "1" : "0"));
                 }
                 catch { }
             }
@@ -280,7 +281,7 @@ namespace crozone.LinuxGpio
         {
             try
             {
-                File.WriteAllText(GetEdgePath(), "both");
+                InternalWriteAllText(GetEdgePath(), "both");
                 return true;
             }
             catch
@@ -510,7 +511,7 @@ namespace crozone.LinuxGpio
             {
                 // Export the gpio
                 //
-                File.WriteAllText(exporterPath, Pin.ToString());
+                InternalWriteAllText(exporterPath, Pin.ToString());
             }
             catch
             {
@@ -549,7 +550,7 @@ namespace crozone.LinuxGpio
             {
                 // Unexport the gpio
                 //
-                File.WriteAllText(exporterPath, Pin.ToString());
+                InternalWriteAllText(exporterPath, Pin.ToString());
             }
             catch
             {
@@ -607,6 +608,24 @@ namespace crozone.LinuxGpio
         private bool SupportsInotify()
         {
             return File.Exists(NotifyWaitHelpers.INotifyWaitPath);
+        }
+
+        private static void InternalWriteAllText(string path, string contents)
+        {
+            using (FileStream fs = new FileStream(path, FileMode.Open, FileAccess.Write, FileShare.ReadWrite))
+            using (StreamWriter writer = new StreamWriter(fs, Encoding.UTF8))
+            {
+                writer.Write(contents);
+            }
+        }
+
+        private static string InternalReadAllText(string path)
+        {
+            using (FileStream fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            using (StreamReader reader = new StreamReader(fs, Encoding.UTF8, false))
+            {
+                return reader.ReadToEnd();
+            }
         }
 
         /// <summary>

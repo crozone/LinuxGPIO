@@ -19,7 +19,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="crozone.AsyncResetEvents" Version="1.0.1" />
+    <PackageReference Include="crozone.AsyncResetEvents" Version="1.0.2" />
   </ItemGroup>
 
 </Project>

@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -125,7 +126,7 @@ namespace crozone.LinuxGpio
 
         private GpioDirection GetDirectionInternal()
         {
-            string currentDirection = File.ReadAllText(GetDirectionPath()).Trim();
+            string currentDirection = InternalReadAllText(GetDirectionPath()).Trim();
 
             if (string.Equals(Constants.GpioDirectionInputValue, currentDirection, StringComparison.OrdinalIgnoreCase))
             {
@@ -153,7 +154,7 @@ namespace crozone.LinuxGpio
 
             // Set the direction
             //
-            File.WriteAllText(pinDirectionPath, directionString);
+            InternalWriteAllText(pinDirectionPath, directionString);
 
             // Set edge detection if the direction is input
             //
@@ -190,7 +191,7 @@ namespace crozone.LinuxGpio
         {
             // Read in the gpio active_low value
             //
-            string activeLowValue = File.ReadAllText(GetActiveLowPath());
+            string activeLowValue = InternalReadAllText(GetActiveLowPath());
 
             // Decode the output
             //
@@ -209,7 +210,7 @@ namespace crozone.LinuxGpio
         {
             try
             {
-                File.WriteAllText(GetActiveLowPath(), (value ? Constants.GpioActiveLowTrueValue : Constants.GpioActiveLowFalseValue));
+                InternalWriteAllText(GetActiveLowPath(), (value ? Constants.GpioActiveLowTrueValue : Constants.GpioActiveLowFalseValue));
             }
             catch { }
         }
@@ -247,7 +248,7 @@ namespace crozone.LinuxGpio
         {
             // Read in the gpio value
             //
-            string pinValue = File.ReadAllText(GetValuePath());
+            string pinValue = InternalReadAllText(GetValuePath());
 
             // Decode the output
             //
@@ -268,7 +269,7 @@ namespace crozone.LinuxGpio
             {
                 // "/sys/class/gpio/gpio32/value"
                 //
-                File.WriteAllText(GetValuePath(), (value ? Constants.GpioValueTrueValue : Constants.GpioValueFalseValue));
+                InternalWriteAllText(GetValuePath(), (value ? Constants.GpioValueTrueValue : Constants.GpioValueFalseValue));
             }
             else
             {
@@ -587,7 +588,7 @@ namespace crozone.LinuxGpio
         {
             try
             {
-                File.WriteAllText(GetEdgePath(), "both");
+                InternalWriteAllText(GetEdgePath(), "both");
                 return true;
             }
             catch
@@ -647,7 +648,7 @@ namespace crozone.LinuxGpio
             {
                 // Export the gpio
                 //
-                File.WriteAllText(exporterPath, Pin.ToString());
+                InternalWriteAllText(exporterPath, Pin.ToString());
             }
             catch
             {
@@ -686,7 +687,7 @@ namespace crozone.LinuxGpio
             {
                 // Unexport the gpio
                 //
-                File.WriteAllText(exporterPath, Pin.ToString());
+                InternalWriteAllText(exporterPath, Pin.ToString());
             }
             catch
             {
@@ -827,6 +828,24 @@ namespace crozone.LinuxGpio
             using (PinChangeRegistrationScope scope = CreateAndRegisterPinChangedScope())
             {
                 return await scope.WhenPinChange(Timeout.InfiniteTimeSpan, cancellationToken);
+            }
+        }
+
+        private static void InternalWriteAllText(string path, string contents)
+        {
+            using (FileStream fs = new FileStream(path, FileMode.Open, FileAccess.Write, FileShare.ReadWrite))
+            using (StreamWriter writer = new StreamWriter(fs, Encoding.UTF8))
+            {
+                writer.Write(contents);
+            }
+        }
+
+        private static string InternalReadAllText(string path)
+        {
+            using (FileStream fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            using (StreamReader reader = new StreamReader(fs, Encoding.UTF8, false))
+            {
+                return reader.ReadToEnd();
             }
         }
     }

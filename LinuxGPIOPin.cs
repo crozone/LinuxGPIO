@@ -29,7 +29,7 @@ namespace crozone.LinuxGpio
         private bool isDisposed;
 
         public int Pin { get; private set; }
-        public string Name { get; private set;  }
+        public string Name { get; private set; }
         public TimeSpan AssertionTime { get; private set; }
         public TimeSpan DeassertionTime { get; private set; }
 
